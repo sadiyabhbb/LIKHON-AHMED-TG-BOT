@@ -15,6 +15,44 @@ const bot = new TelegramBot(token, {
   }
 });
 
+// Local BIN Database
+const binDatabase = {
+  "515462": {
+    "bank": "Example Bank",
+    "country": "United States",
+    "emoji": "🇺🇸",
+    "scheme": "Visa",
+    "type": "Credit",
+    "phone": "+1 800-123-4567",
+    "level": "Standard",
+    "address": "123 Example St, City, State, ZIP",
+    "customer_service_hours": "Mon-Fri: 9 AM - 5 PM"
+  },
+  "401288": {
+    "bank": "Another Bank",
+    "country": "United Kingdom",
+    "emoji": "🇬🇧",
+    "scheme": "Visa",
+    "type": "Debit",
+    "phone": "+44 20 1234 5678",
+    "level": "Gold",
+    "address": "456 Another Rd, London, UK",
+    "customer_service_hours": "Mon-Fri: 8 AM - 6 PM"
+  },
+  "510510": {
+    "bank": "Sample Bank",
+    "country": "Canada",
+    "emoji": "🇨🇦",
+    "scheme": "MasterCard",
+    "type": "Credit",
+    "phone": "+1 888-123-4567",
+    "level": "Platinum",
+    "address": "789 Sample Ave, Toronto, ON, Canada",
+    "customer_service_hours": "Mon-Sun: 10 AM - 8 PM"
+  },
+  // Add more BINs with additional info as needed
+};
+
 // Luhn Algorithm Check
 function luhnCheck(num) {
   let arr = (num + '').split('').reverse().map(x => parseInt(x));
@@ -39,15 +77,20 @@ function generateValidCard(bin) {
   return `${cardNumber}|${month}|20${year}|${cvv}`;
 }
 
-// Message Formatter (Updated)
+// Message Formatter
 function createCCMessage(bin, binInfo, cards) {
   const message =
-    `💳 Generated CC (${bin})\n\n` +
-    `📋 Tap any card below to copy:\n\n` +
+    `💳 **Generated Credit Cards for BIN: ${bin}**\n\n` +
+    `📋 **Tap any card below to copy:**\n\n` +
     cards.map(card => `\`${card}\``).join('\n') + 
-    `\n\n🏦 Bank: ${binInfo.bank}\n` +
-    `🌎 Country: ${binInfo.country} ${binInfo.emoji}\n` +
-    `🔖 Type: ${binInfo.type}`;
+    `\n\n🏦 **Bank:** ${binInfo.bank}\n` +
+    `🌎 **Country:** ${binInfo.country} ${binInfo.emoji}\n` +
+    `🔖 **Card Scheme:** ${binInfo.scheme}\n` +
+    `🔖 **Card Type:** ${binInfo.type}\n` +
+    `📞 **Customer Service Phone:** ${binInfo.phone}\n` +
+    `🏢 **Bank Address:** ${binInfo.address}\n` +
+    `🕒 **Customer Service Hours:** ${binInfo.customer_service_hours}\n` +
+    `💳 **Card Level:** ${binInfo.level}`;
 
   return {
     text: message,
@@ -74,7 +117,8 @@ bot.onText(/\/gen (.+)/, async (msg, match) => {
     return bot.sendMessage(chatId, "⚠️ Please enter a valid BIN (6+ digits)\nExample: /gen 515462");
   }
 
-  const cards = Array.from({ length: 10 }, () => generateValidCard(bin));
+  // Generate 20 valid credit cards
+  const cards = Array.from({ length: 20 }, () => generateValidCard(bin));
   const binInfo = await getBinInfo(bin.substring(0, 8));
   const message = createCCMessage(bin, binInfo, cards);
 
@@ -83,6 +127,12 @@ bot.onText(/\/gen (.+)/, async (msg, match) => {
 
 // BIN Information Lookup
 async function getBinInfo(bin) {
+  // Check local BIN database first
+  if (binDatabase[bin]) {
+    return binDatabase[bin];
+  }
+
+  // If not found, make an API call
   try {
     const response = await axios.get(`https://lookup.binlist.net/${bin}`);
     return {
@@ -90,7 +140,11 @@ async function getBinInfo(bin) {
       country: response.data.country?.name || "UNKNOWN",
       emoji: response.data.country?.emoji || "",
       scheme: response.data.scheme?.toUpperCase() || "UNKNOWN",
-      type: response.data.type?.toUpperCase() || "UNKNOWN"
+      type: response.data.type?.toUpperCase() || "UNKNOWN",
+      phone: "N/A",
+      level: "N/A",
+      address: "N/A",
+      customer_service_hours: "N/A"
     };
   } catch (error) {
     console.error('Error fetching BIN info:', error.message);
@@ -99,7 +153,11 @@ async function getBinInfo(bin) {
       country: "UNKNOWN",
       emoji: "",
       scheme: "UNKNOWN",
-      type: "UNKNOWN"
+      type: "UNKNOWN",
+      phone: "N/A",
+      level: "N/A",
+      address: "N/A",
+      customer_service_hours: "N/A"
     };
   }
 }
