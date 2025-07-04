@@ -5,13 +5,12 @@ const http = require('http');
 
 // Configuration
 const token = process.env.BOT_TOKEN;
-const forceJoinChannel = process.env.CHANNEL_USERNAME;
 
 const bot = new TelegramBot(token, {
   polling: true,
   fileDownloadOptions: {
     headers: {
-      'User-Agent': 'Telegram Bot'
+      'User -Agent': 'Telegram Bot'
     }
   }
 });
@@ -62,48 +61,14 @@ function createCCMessage(bin, binInfo, cards) {
 // /start Command
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  const userId = msg.from.id;
 
-  try {
-    const member = await bot.getChatMember(`@${forceJoinChannel}`, userId);
-    if (["left", "kicked"].includes(member.status)) {
-      return bot.sendMessage(chatId, `🚫 Please join our channel first: https://t.me/${forceJoinChannel}`, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "✅ Join Channel", url: `https://t.me/${forceJoinChannel}` }],
-            [{ text: "🔄 Check Join Status", callback_data: "check_join" }]
-          ]
-        }
-      });
-    }
-    bot.sendMessage(chatId, `🎉 Bot is ready to use!\n\n💳 Generate CCs with:\n/gen 515462`);
-  } catch (error) {
-    console.error('Error in /start command:', error.message);
-    bot.sendMessage(chatId, '❌ Server error, please try again later');
-  }
+  bot.sendMessage(chatId, `🎉 Bot is ready to use!\n\n💳 Generate CCs with:\n/gen 515462`);
 });
 
 // /gen Command
 bot.onText(/\/gen (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
-  const userId = msg.from.id;
   const bin = match[1].trim().replace(/\D/g, '');
-
-  try {
-    const member = await bot.getChatMember(`@${forceJoinChannel}`, userId);
-    if (["left", "kicked"].includes(member.status)) {
-      return bot.sendMessage(chatId, `🚫 Please join our channel first: @${forceJoinChannel}`, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "✅ Join Channel", url: `https://t.me/${forceJoinChannel}` }],
-            [{ text: "🔄 Check Join Status", callback_data: "check_join" }]
-          ]
-        }
-      });
-    }
-  } catch (error) {
-    return bot.sendMessage(chatId, '❌ Server error, please try again later');
-  }
 
   if (!/^\d{6,}$/.test(bin)) {
     return bot.sendMessage(chatId, "⚠️ Please enter a valid BIN (6+ digits)\nExample: /gen 515462");
@@ -138,53 +103,6 @@ async function getBinInfo(bin) {
     };
   }
 }
-
-// Check Join Button Callback
-bot.on('callback_query', async (callbackQuery) => {
-  const chatId = callbackQuery.message.chat.id;
-  const userId = callbackQuery.from.id;
-  const messageId = callbackQuery.message.message_id;
-
-  try {
-    const member = await bot.getChatMember(`@${forceJoinChannel}`, userId);
-    
-    if (["left", "kicked"].includes(member.status)) {
-      await bot.editMessageText(
-        `🚫 You still haven't joined our channel. Please join first: https://t.me/${forceJoinChannel}`,
-        {
-          chat_id: chatId,
-          message_id: messageId,
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "✅ Join Channel", url: `https://t.me/${forceJoinChannel}` }],
-              [{ text: "🔄 Check Join Status", callback_data: "check_join" }]
-            ]
-          }
-        }
-      );
-    } else {
-      await bot.editMessageText(
-        "🎉 Thank you! You've joined the channel. You can now use the bot.\n\n💳 Generate CCs with:\n/gen 515462",
-        {
-          chat_id: chatId,
-          message_id: messageId,
-          reply_markup: { inline_keyboard: [] }
-        }
-      );
-    }
-  } catch (error) {
-    console.error('Error checking join status:', error.message);
-    await bot.editMessageText(
-      "❌ Server error, please try again later",
-      {
-        chat_id: chatId,
-        message_id: messageId
-      }
-    );
-  }
-  
-  bot.answerCallbackQuery(callbackQuery.id);
-});
 
 // Keep-alive HTTP Server
 http.createServer((req, res) => {
