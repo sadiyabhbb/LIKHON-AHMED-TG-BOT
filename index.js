@@ -23,10 +23,7 @@ const binDatabase = {
     "emoji": "🇺🇸",
     "scheme": "Visa",
     "type": "Credit",
-    "phone": "+1 800-123-4567",
-    "level": "Standard",
-    "address": "123 Example St, City, State, ZIP",
-    "customer_service_hours": "Mon-Fri: 9 AM - 5 PM"
+    "level": "Standard"
   },
   "401288": {
     "bank": "Another Bank",
@@ -34,10 +31,7 @@ const binDatabase = {
     "emoji": "🇬🇧",
     "scheme": "Visa",
     "type": "Debit",
-    "phone": "+44 20 1234 5678",
-    "level": "Gold",
-    "address": "456 Another Rd, London, UK",
-    "customer_service_hours": "Mon-Fri: 8 AM - 6 PM"
+    "level": "Gold"
   },
   "510510": {
     "bank": "Sample Bank",
@@ -45,10 +39,7 @@ const binDatabase = {
     "emoji": "🇨🇦",
     "scheme": "MasterCard",
     "type": "Credit",
-    "phone": "+1 888-123-4567",
-    "level": "Platinum",
-    "address": "789 Sample Ave, Toronto, ON, Canada",
-    "customer_service_hours": "Mon-Sun: 10 AM - 8 PM"
+    "level": "Platinum"
   },
   // Add more BINs with additional info as needed
 };
@@ -87,9 +78,6 @@ function createCCMessage(bin, binInfo, cards) {
     `🌎 **Country:** ${binInfo.country} ${binInfo.emoji}\n` +
     `🔖 **Card Scheme:** ${binInfo.scheme}\n` +
     `🔖 **Card Type:** ${binInfo.type}\n` +
-    `📞 **Customer Service Phone:** ${binInfo.phone}\n` +
-    `🏢 **Bank Address:** ${binInfo.address}\n` +
-    `🕒 **Customer Service Hours:** ${binInfo.customer_service_hours}\n` +
     `💳 **Card Level:** ${binInfo.level}`;
 
   return {
@@ -141,10 +129,7 @@ async function getBinInfo(bin) {
       emoji: response.data.country?.emoji || "",
       scheme: response.data.scheme?.toUpperCase() || "UNKNOWN",
       type: response.data.type?.toUpperCase() || "UNKNOWN",
-      phone: "N/A",
-      level: "N/A",
-      address: "N/A",
-      customer_service_hours: "N/A"
+      level: "N/A"
     };
   } catch (error) {
     console.error('Error fetching BIN info:', error.message);
@@ -154,10 +139,7 @@ async function getBinInfo(bin) {
       emoji: "",
       scheme: "UNKNOWN",
       type: "UNKNOWN",
-      phone: "N/A",
-      level: "N/A",
-      address: "N/A",
-      customer_service_hours: "N/A"
+      level: "N/A"
     };
   }
 }
