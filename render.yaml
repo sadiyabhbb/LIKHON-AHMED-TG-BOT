@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: telegram-force-join-bot
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: BOT_TOKEN
+        value: your_bot_token
+      - key: CHANNEL_USERNAME
+        value: your_channel_username
