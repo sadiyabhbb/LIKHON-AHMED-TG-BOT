@@ -2,18 +2,32 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
 // Configuration
 const token = process.env.BOT_TOKEN;
-
 const bot = new TelegramBot(token, {
   polling: true,
   fileDownloadOptions: {
     headers: {
-      'User -Agent': 'Telegram Bot'
+      'User-Agent': 'Telegram Bot'
     }
   }
 });
+
+// Admin Username (without @)
+const ADMIN_USERNAME = 'rx_rihad';
+
+// User DB Paths
+const DB_PATH = path.join(__dirname, 'users.json');
+let userDB = { approved: [], pending: [], banned: [] };
+if (fs.existsSync(DB_PATH)) {
+  userDB = JSON.parse(fs.readFileSync(DB_PATH));
+}
+function saveDB() {
+  fs.writeFileSync(DB_PATH, JSON.stringify(userDB, null, 2));
+}
 
 // Local BIN Database
 const binDatabase = {
@@ -40,8 +54,7 @@ const binDatabase = {
     "scheme": "MasterCard",
     "type": "Credit",
     "level": "Platinum"
-  },
-  // Add more BINs with additional info as needed
+  }
 };
 
 // Luhn Algorithm Check
@@ -89,23 +102,52 @@ function createCCMessage(bin, binInfo, cards) {
   };
 }
 
-// /start Command
+// /start Command with UID system
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const username = msg.from.username || 'NoUsername';
+
+  if (userDB.banned.includes(userId)) {
+    return bot.sendMessage(chatId, '🚫 You are banned from using this bot.');
+  }
+
+  if (!userDB.approved.includes(userId)) {
+    if (!userDB.pending.includes(userId)) {
+      userDB.pending.push(userId);
+      saveDB();
+
+      bot.sendMessage(chatId, `⏳ Request sent. Please wait for admin approval.`);
+      bot.sendMessage(chatId, `🧾 Your UID: \`${userId}\`\n\nSend this to the admin (@${ADMIN_USERNAME}) for approval.`, {
+        parse_mode: "Markdown"
+      });
+
+      bot.sendMessage(ADMIN_USERNAME, `👤 New User Request\n\n🆔 UID: \`${userId}\`\n👤 Username: @${username}`, {
+        parse_mode: "Markdown"
+      });
+    } else {
+      bot.sendMessage(chatId, `⏳ You are already in pending list.\nPlease wait for approval.`);
+    }
+    return;
+  }
 
   bot.sendMessage(chatId, `🎉 Bot is ready to use!\n\n💳 Generate CCs with:\n/gen 515462`);
 });
 
-// /gen Command
+// /gen Command (restricted)
 bot.onText(/\/gen (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
-  const bin = match[1].trim().replace(/\D/g, '');
+  const userId = msg.from.id;
 
+  if (!userDB.approved.includes(userId)) {
+    return bot.sendMessage(chatId, `⛔ You are not approved to use this bot.\nAsk @${ADMIN_USERNAME} for access.`);
+  }
+
+  const bin = match[1].trim().replace(/\D/g, '');
   if (!/^\d{6,}$/.test(bin)) {
     return bot.sendMessage(chatId, "⚠️ Please enter a valid BIN (6+ digits)\nExample: /gen 515462");
   }
 
-  // Generate 20 valid credit cards
   const cards = Array.from({ length: 20 }, () => generateValidCard(bin));
   const binInfo = await getBinInfo(bin.substring(0, 8));
   const message = createCCMessage(bin, binInfo, cards);
@@ -113,14 +155,41 @@ bot.onText(/\/gen (.+)/, async (msg, match) => {
   await bot.sendMessage(chatId, message.text, message.options);
 });
 
+// /approve UID (admin only)
+bot.onText(/\/approve (\d+)/, (msg, match) => {
+  if (msg.from.username !== ADMIN_USERNAME) return;
+
+  const uid = parseInt(match[1]);
+  if (!userDB.approved.includes(uid)) {
+    userDB.approved.push(uid);
+    userDB.pending = userDB.pending.filter(id => id !== uid);
+    saveDB();
+    bot.sendMessage(uid, '✅ Your access has been approved by admin!');
+    bot.sendMessage(msg.chat.id, `✅ Approved UID: \`${uid}\``, { parse_mode: 'Markdown' });
+  } else {
+    bot.sendMessage(msg.chat.id, `⚠️ UID \`${uid}\` is already approved.`, { parse_mode: 'Markdown' });
+  }
+});
+
+// /ban UID (admin only)
+bot.onText(/\/ban (\d+)/, (msg, match) => {
+  if (msg.from.username !== ADMIN_USERNAME) return;
+
+  const uid = parseInt(match[1]);
+  userDB.banned.push(uid);
+  userDB.approved = userDB.approved.filter(id => id !== uid);
+  userDB.pending = userDB.pending.filter(id => id !== uid);
+  saveDB();
+  bot.sendMessage(uid, '🚫 You have been banned by admin.');
+  bot.sendMessage(msg.chat.id, `🚫 Banned UID: \`${uid}\``, { parse_mode: 'Markdown' });
+});
+
 // BIN Information Lookup
 async function getBinInfo(bin) {
-  // Check local BIN database first
   if (binDatabase[bin]) {
     return binDatabase[bin];
   }
 
-  // If not found, make an API call
   try {
     const response = await axios.get(`https://lookup.binlist.net/${bin}`);
     return {
