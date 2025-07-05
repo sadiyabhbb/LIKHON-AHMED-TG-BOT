@@ -102,23 +102,30 @@ function createCCMessage(bin, binInfo, cards) {
   };
 }
 
-// /start Command with UID system
+// /start Command (fixed with UID & admin check)
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const username = msg.from.username || 'NoUsername';
 
+  // ✅ Admin always gets access directly
+  if (username === ADMIN_USERNAME) {
+    return bot.sendMessage(chatId, `🎉 Welcome Admin!\nBot is ready to use!\n\n💳 Try /gen 515462`);
+  }
+
+  // 🚫 Banned user
   if (userDB.banned.includes(userId)) {
     return bot.sendMessage(chatId, '🚫 You are banned from using this bot.');
   }
 
+  // ⏳ If not approved, show UID and request
   if (!userDB.approved.includes(userId)) {
     if (!userDB.pending.includes(userId)) {
       userDB.pending.push(userId);
       saveDB();
 
       bot.sendMessage(chatId, `⏳ Request sent. Please wait for admin approval.`);
-      bot.sendMessage(chatId, `🧾 Your UID: \`${userId}\`\n\nSend this to the admin (@${ADMIN_USERNAME}) for approval.`, {
+      bot.sendMessage(chatId, `🧾 Your UID: \`${userId}\`\nSend this to the admin (@${ADMIN_USERNAME}) for approval.`, {
         parse_mode: "Markdown"
       });
 
@@ -126,11 +133,14 @@ bot.onText(/\/start/, async (msg) => {
         parse_mode: "Markdown"
       });
     } else {
-      bot.sendMessage(chatId, `⏳ You are already in pending list.\nPlease wait for approval.`);
+      bot.sendMessage(chatId, `⏳ You are already in pending list.\nPlease wait for approval.\n\n🧾 Your UID: \`${userId}\``, {
+        parse_mode: "Markdown"
+      });
     }
     return;
   }
 
+  // ✅ Approved user
   bot.sendMessage(chatId, `🎉 Bot is ready to use!\n\n💳 Generate CCs with:\n/gen 515462`);
 });
 
