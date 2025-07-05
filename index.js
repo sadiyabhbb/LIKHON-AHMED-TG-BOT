@@ -18,7 +18,7 @@ const bot = new TelegramBot(token, {
 
 // Admin Info
 const ADMIN_USERNAME = 'rx_rihad';
-const ADMIN_UID = 7933110913; // <-- Replace with your actual UID
+const ADMIN_UID = 7933110913;
 
 // User DB Paths
 const DB_PATH = path.join(__dirname, 'users.json');
@@ -211,6 +211,93 @@ bot.onText(/\/users/, (msg) => {
     `🚫 *Banned:* ${format(userDB.banned)}`;
 
   bot.sendMessage(msg.chat.id, message, { parse_mode: 'Markdown' });
+});
+
+// .chk command
+bot.onText(/\.chk (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const username = msg.from.username || 'NoUsername';
+
+  if (userId !== ADMIN_UID && !userDB.approved.includes(userId)) {
+    return bot.sendMessage(chatId, `⛔ You are not approved to use this bot.\nAsk @${ADMIN_USERNAME} for access.`);
+  }
+
+  const card = match[1].trim();
+  if (!/^\d{15,16}\|\d{2}\|\d{4}\|\d{3}$/.test(card)) {
+    return bot.sendMessage(chatId, '⚠️ Invalid format.\nCorrect: `xxxx|mm|yyyy|cvv`', { parse_mode: 'Markdown' });
+  }
+
+  bot.sendMessage(chatId, `🔁 Checking your card via chkr.cc...`);
+
+  try {
+    const res = await axios.get(`https://chkr.cc/api/chk?cards=${card}`);
+    const result = res.data?.result?.[0];
+
+    const status = result?.status || 'unknown';
+    const msgText = result?.msg || 'No message';
+
+    let icon = '❓';
+    if (status === 'live') icon = '✅🟢';
+    else if (status === 'dead') icon = '❌🔴';
+    else if (status === 'unknown') icon = '⚠️❓';
+
+    const message = 
+      `\`${card}\`\n` +
+      `${icon} *${status.toUpperCase()}*\n` +
+      `ℹ️ ${msgText}\n\n` +
+      `👤 Checked by: @${username}`;
+
+    bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+  } catch {
+    bot.sendMessage(chatId, '❌ Error contacting chkr.cc API.');
+  }
+});
+
+// .mass command
+bot.onText(/\.mass/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const username = msg.from.username || 'NoUsername';
+
+  if (userId !== ADMIN_UID && !userDB.approved.includes(userId)) {
+    return bot.sendMessage(chatId, `⛔ You are not approved to use this bot.\nAsk @${ADMIN_USERNAME} for access.`);
+  }
+
+  const replyMsg = msg.reply_to_message?.text;
+  if (!replyMsg) return bot.sendMessage(chatId, '❌ Reply to a message containing CCs to use `.mass`');
+
+  const cards = replyMsg
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => /^\d{15,16}\|\d{2}\|\d{4}\|\d{3}$/.test(l));
+
+  if (!cards.length) return bot.sendMessage(chatId, '⚠️ No valid CCs found in replied message.');
+
+  bot.sendMessage(chatId, `🔁 Checking ${cards.length} cards via chkr.cc...`);
+
+  let responseText = `👤 ${username} - .mass\n\n`;
+
+  for (const card of cards) {
+    try {
+      const res = await axios.get(`https://chkr.cc/api/chk?cards=${card}`);
+      const result = res.data?.result?.[0];
+
+      const status = result?.status || 'unknown';
+      const msg = result?.msg || 'No message';
+
+      let icon = '❓';
+      if (status === 'live') icon = '✅🟢';
+      else if (status === 'dead') icon = '❌🔴';
+      else if (status === 'unknown') icon = '⚠️❓';
+
+      responseText += `\`${card}\`\n${icon} *${status.toUpperCase()}* - ${msg}\n\n`;
+    } catch {
+      responseText += `\`${card}\`\n⚠️ API error\n\n`;
+    }
+  }
+
+  bot.sendMessage(chatId, responseText.trim(), { parse_mode: 'Markdown' });
 });
 
 // BIN Lookup
