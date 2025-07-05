@@ -18,7 +18,7 @@ const bot = new TelegramBot(token, {
 
 // Admin Info
 const ADMIN_USERNAME = 'rx_rihad';
-const ADMIN_UID = 7933110913; // <-- Replace with your real UID
+const ADMIN_UID = 123456789; // <-- Replace with your actual UID
 
 // User DB Paths
 const DB_PATH = path.join(__dirname, 'users.json');
@@ -33,16 +33,18 @@ function saveDB() {
 // Admin Notification Function
 function notifyAdmin(uid, username, isRepeat = false) {
   const status = isRepeat ? "⏳ Already Pending" : "📩 Pending Approval";
+  const cleanUsername = username.replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
   const message = 
-    `👤 New Access Request\n\n` +
+    `👤 *New Access Request*\n\n` +
     `🆔 UID: \`${uid}\`\n` +
-    `🔗 Username: @${username}\n` +
+    `🔗 Username: @${cleanUsername}\n` +
     `📩 Status: ${status}\n\n` +
-    `🛂 Action Needed:\n` +
-    `✅ Approve: /approve ${uid}\n` +
-    `🚫 Ban: /ban ${uid}`;
+    `🛂 *Action Needed:*\n` +
+    `✅ /approve \`${uid}\`\n` +
+    `🗑️ /remove \`${uid}\`\n` +
+    `🚫 /ban \`${uid}\``;
 
-  bot.sendMessage(ADMIN_UID, message, { parse_mode: 'Markdown' });
+  bot.sendMessage(ADMIN_UID, message, { parse_mode: 'MarkdownV2' });
 }
 
 // Local BIN Database
@@ -54,22 +56,6 @@ const binDatabase = {
     "scheme": "Visa",
     "type": "Credit",
     "level": "Standard"
-  },
-  "401288": {
-    "bank": "Another Bank",
-    "country": "United Kingdom",
-    "emoji": "🇬🇧",
-    "scheme": "Visa",
-    "type": "Debit",
-    "level": "Gold"
-  },
-  "510510": {
-    "bank": "Sample Bank",
-    "country": "Canada",
-    "emoji": "🇨🇦",
-    "scheme": "MasterCard",
-    "type": "Credit",
-    "level": "Platinum"
   }
 };
 
@@ -100,20 +86,19 @@ function generateValidCard(bin) {
 // Format Message
 function createCCMessage(bin, binInfo, cards) {
   const message =
-    `💳 **Generated Credit Cards for BIN: ${bin}**\n\n` +
-    `📋 **Tap any card below to copy:**\n\n` +
+    `💳 *Generated Credit Cards for BIN:* \`${bin}\`\n\n` +
+    `📋 *Tap any card below to copy:*\n\n` +
     cards.map(card => `\`${card}\``).join('\n') + 
-    `\n\n🏦 **Bank:** ${binInfo.bank}\n` +
-    `🌎 **Country:** ${binInfo.country} ${binInfo.emoji}\n` +
-    `🔖 **Card Scheme:** ${binInfo.scheme}\n` +
-    `🔖 **Card Type:** ${binInfo.type}\n` +
-    `💳 **Card Level:** ${binInfo.level}`;
+    `\n\n🏦 *Bank:* ${binInfo.bank}\n` +
+    `🌎 *Country:* ${binInfo.country} ${binInfo.emoji}\n` +
+    `🔖 *Card Scheme:* ${binInfo.scheme}\n` +
+    `🔖 *Card Type:* ${binInfo.type}\n` +
+    `💳 *Card Level:* ${binInfo.level}`;
 
   return {
     text: message,
     options: {
-      parse_mode: 'Markdown',
-      disable_web_page_preview: true
+      parse_mode: 'Markdown'
     }
   };
 }
@@ -145,7 +130,7 @@ bot.onText(/\/start/, async (msg) => {
       bot.sendMessage(chatId, `⏳ You are already in pending list.\n\n🧾 Your UID: \`${userId}\``, {
         parse_mode: "Markdown"
       });
-      notifyAdmin(userId, username, true); // optional repeat notify
+      notifyAdmin(userId, username, true);
     }
     return;
   }
@@ -174,7 +159,7 @@ bot.onText(/\/gen (.+)/, async (msg, match) => {
   await bot.sendMessage(chatId, message.text, message.options);
 });
 
-// /approve command
+// /approve
 bot.onText(/\/approve (\d+)/, (msg, match) => {
   if (msg.from.username !== ADMIN_USERNAME && msg.from.id !== ADMIN_UID) return;
 
@@ -190,7 +175,7 @@ bot.onText(/\/approve (\d+)/, (msg, match) => {
   }
 });
 
-// /ban command
+// /ban
 bot.onText(/\/ban (\d+)/, (msg, match) => {
   if (msg.from.username !== ADMIN_USERNAME && msg.from.id !== ADMIN_UID) return;
 
@@ -203,11 +188,34 @@ bot.onText(/\/ban (\d+)/, (msg, match) => {
   bot.sendMessage(msg.chat.id, `🚫 Banned UID: \`${uid}\``, { parse_mode: 'Markdown' });
 });
 
+// /remove
+bot.onText(/\/remove (\d+)/, (msg, match) => {
+  if (msg.from.username !== ADMIN_USERNAME && msg.from.id !== ADMIN_UID) return;
+
+  const uid = parseInt(match[1]);
+  userDB.pending = userDB.pending.filter(id => id !== uid);
+  userDB.approved = userDB.approved.filter(id => id !== uid);
+  saveDB();
+  bot.sendMessage(msg.chat.id, `🗑️ Removed UID: \`${uid}\``, { parse_mode: 'Markdown' });
+});
+
+// /users
+bot.onText(/\/users/, (msg) => {
+  if (msg.from.username !== ADMIN_USERNAME && msg.from.id !== ADMIN_UID) return;
+
+  const format = (arr) => arr.length ? arr.map(id => `\`${id}\``).join(', ') : '_None_';
+  const message = 
+    `👥 *User List:*\n\n` +
+    `✅ *Approved:* ${format(userDB.approved)}\n` +
+    `🕓 *Pending:* ${format(userDB.pending)}\n` +
+    `🚫 *Banned:* ${format(userDB.banned)}`;
+
+  bot.sendMessage(msg.chat.id, message, { parse_mode: 'Markdown' });
+});
+
 // BIN Lookup
 async function getBinInfo(bin) {
-  if (binDatabase[bin]) {
-    return binDatabase[bin];
-  }
+  if (binDatabase[bin]) return binDatabase[bin];
 
   try {
     const response = await axios.get(`https://lookup.binlist.net/${bin}`);
@@ -219,8 +227,7 @@ async function getBinInfo(bin) {
       type: response.data.type?.toUpperCase() || "UNKNOWN",
       level: "N/A"
     };
-  } catch (error) {
-    console.error('Error fetching BIN info:', error.message);
+  } catch {
     return {
       bank: "UNKNOWN BANK",
       country: "UNKNOWN",
@@ -235,15 +242,7 @@ async function getBinInfo(bin) {
 // Keep-alive
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/html' });
-  res.end(`
-    <html>
-      <head><title>Telegram CC Generator</title></head>
-      <body style="font-family: Arial; text-align: center; margin-top: 50px;">
-        <h2>Telegram CC Generator Bot</h2>
-        <p>✅ Bot is Running Successfully</p>
-      </body>
-    </html>
-  `);
+  res.end(`<h2>✅ Telegram Bot Running</h2>`);
 }).listen(process.env.PORT || 3000);
 
 console.log('✅ Bot is running...');
