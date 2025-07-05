@@ -143,7 +143,7 @@ bot.onText(/\/gen (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
-  if (!userDB.approved.includes(userId)) {
+  if (userId !== ADMIN_UID && !userDB.approved.includes(userId)) {
     return bot.sendMessage(chatId, `⛔ You are not approved to use this bot.\nAsk @${ADMIN_USERNAME} for access.`);
   }
 
