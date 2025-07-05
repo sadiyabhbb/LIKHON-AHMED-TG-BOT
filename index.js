@@ -16,8 +16,9 @@ const bot = new TelegramBot(token, {
   }
 });
 
-// Admin Username (without @)
+// Admin Info
 const ADMIN_USERNAME = 'rx_rihad';
+const ADMIN_UID = 7933110913; // <-- Replace with your real UID
 
 // User DB Paths
 const DB_PATH = path.join(__dirname, 'users.json');
@@ -27,6 +28,21 @@ if (fs.existsSync(DB_PATH)) {
 }
 function saveDB() {
   fs.writeFileSync(DB_PATH, JSON.stringify(userDB, null, 2));
+}
+
+// Admin Notification Function
+function notifyAdmin(uid, username, isRepeat = false) {
+  const status = isRepeat ? "⏳ Already Pending" : "📩 Pending Approval";
+  const message = 
+    `👤 New Access Request\n\n` +
+    `🆔 UID: \`${uid}\`\n` +
+    `🔗 Username: @${username}\n` +
+    `📩 Status: ${status}\n\n` +
+    `🛂 Action Needed:\n` +
+    `✅ Approve: /approve ${uid}\n` +
+    `🚫 Ban: /ban ${uid}`;
+
+  bot.sendMessage(ADMIN_UID, message, { parse_mode: 'Markdown' });
 }
 
 // Local BIN Database
@@ -57,7 +73,7 @@ const binDatabase = {
   }
 };
 
-// Luhn Algorithm Check
+// Luhn Check
 function luhnCheck(num) {
   let arr = (num + '').split('').reverse().map(x => parseInt(x));
   let lastDigit = arr.shift();
@@ -66,7 +82,7 @@ function luhnCheck(num) {
   return (sum + lastDigit) % 10 === 0;
 }
 
-// Generate Valid Credit Cards
+// Generate Cards
 function generateValidCard(bin) {
   let cardNumber;
   do {
@@ -81,7 +97,7 @@ function generateValidCard(bin) {
   return `${cardNumber}|${month}|20${year}|${cvv}`;
 }
 
-// Message Formatter
+// Format Message
 function createCCMessage(bin, binInfo, cards) {
   const message =
     `💳 **Generated Credit Cards for BIN: ${bin}**\n\n` +
@@ -102,49 +118,42 @@ function createCCMessage(bin, binInfo, cards) {
   };
 }
 
-// /start Command (fixed with UID & admin check)
+// /start command
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const username = msg.from.username || 'NoUsername';
 
-  // ✅ Admin always gets access directly
-  if (username === ADMIN_USERNAME) {
+  if (username === ADMIN_USERNAME || userId === ADMIN_UID) {
     return bot.sendMessage(chatId, `🎉 Welcome Admin!\nBot is ready to use!\n\n💳 Try /gen 515462`);
   }
 
-  // 🚫 Banned user
   if (userDB.banned.includes(userId)) {
     return bot.sendMessage(chatId, '🚫 You are banned from using this bot.');
   }
 
-  // ⏳ If not approved, show UID and request
   if (!userDB.approved.includes(userId)) {
     if (!userDB.pending.includes(userId)) {
       userDB.pending.push(userId);
       saveDB();
-
       bot.sendMessage(chatId, `⏳ Request sent. Please wait for admin approval.`);
       bot.sendMessage(chatId, `🧾 Your UID: \`${userId}\`\nSend this to the admin (@${ADMIN_USERNAME}) for approval.`, {
         parse_mode: "Markdown"
       });
-
-      bot.sendMessage(ADMIN_USERNAME, `👤 New User Request\n\n🆔 UID: \`${userId}\`\n👤 Username: @${username}`, {
-        parse_mode: "Markdown"
-      });
+      notifyAdmin(userId, username);
     } else {
-      bot.sendMessage(chatId, `⏳ You are already in pending list.\nPlease wait for approval.\n\n🧾 Your UID: \`${userId}\``, {
+      bot.sendMessage(chatId, `⏳ You are already in pending list.\n\n🧾 Your UID: \`${userId}\``, {
         parse_mode: "Markdown"
       });
+      notifyAdmin(userId, username, true); // optional repeat notify
     }
     return;
   }
 
-  // ✅ Approved user
   bot.sendMessage(chatId, `🎉 Bot is ready to use!\n\n💳 Generate CCs with:\n/gen 515462`);
 });
 
-// /gen Command (restricted)
+// /gen command
 bot.onText(/\/gen (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
@@ -165,9 +174,9 @@ bot.onText(/\/gen (.+)/, async (msg, match) => {
   await bot.sendMessage(chatId, message.text, message.options);
 });
 
-// /approve UID (admin only)
+// /approve command
 bot.onText(/\/approve (\d+)/, (msg, match) => {
-  if (msg.from.username !== ADMIN_USERNAME) return;
+  if (msg.from.username !== ADMIN_USERNAME && msg.from.id !== ADMIN_UID) return;
 
   const uid = parseInt(match[1]);
   if (!userDB.approved.includes(uid)) {
@@ -181,9 +190,9 @@ bot.onText(/\/approve (\d+)/, (msg, match) => {
   }
 });
 
-// /ban UID (admin only)
+// /ban command
 bot.onText(/\/ban (\d+)/, (msg, match) => {
-  if (msg.from.username !== ADMIN_USERNAME) return;
+  if (msg.from.username !== ADMIN_USERNAME && msg.from.id !== ADMIN_UID) return;
 
   const uid = parseInt(match[1]);
   userDB.banned.push(uid);
@@ -194,7 +203,7 @@ bot.onText(/\/ban (\d+)/, (msg, match) => {
   bot.sendMessage(msg.chat.id, `🚫 Banned UID: \`${uid}\``, { parse_mode: 'Markdown' });
 });
 
-// BIN Information Lookup
+// BIN Lookup
 async function getBinInfo(bin) {
   if (binDatabase[bin]) {
     return binDatabase[bin];
@@ -223,7 +232,7 @@ async function getBinInfo(bin) {
   }
 }
 
-// Keep-alive HTTP Server
+// Keep-alive
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/html' });
   res.end(`
