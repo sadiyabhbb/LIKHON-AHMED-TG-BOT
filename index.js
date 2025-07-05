@@ -12,7 +12,7 @@ const bot = new TelegramBot(token, {
   polling: true,
   fileDownloadOptions: {
     headers: {
-      'User-Agent': 'Telegram Bot'
+      'User -Agent': 'Telegram Bot'
     }
   }
 });
@@ -232,7 +232,7 @@ bot.onText(/\/users/, (msg) => {
 
   const format = (arr) => arr.length ? arr.map(id => `\`${id}\``).join(', ') : '_None_';
   const message = 
-    `👥 *User List:*\n\n` +
+    `👥 *User  List:*\n\n` +
     `✅ *Approved:* ${format(userDB.approved)}\n` +
     `🕓 *Pending:* ${format(userDB.pending)}\n` +
     `🚫 *Banned:* ${format(userDB.banned)}`;
@@ -352,6 +352,62 @@ async function getBinInfo(bin) {
     };
   }
 }
+
+// Check Email Functionality
+const DOMAINS = [
+  '@iicloud.com.vn',
+  '@mail10s.top',
+  '@hotmail999.com',
+  '@mailshopee.io.vn',
+  '@gmail.com'
+];
+
+async function checkEmail(username, chatId) {
+  try {
+    let found = false;
+
+    for (const domain of DOMAINS) {
+      const email = `${username}${domain}`;
+      const apiUrl = `https://hotmail999.com/api/get_mail.php?email=${encodeURIComponent(email)}`;
+
+      try {
+        const { data } = await axios.get(apiUrl);
+
+        if (data?.status && data?.data?.length > 0) {
+          const mail = data.data[0];
+          const msg = `
+📭 *ইমেইল পাওয়া গেছে!*
+✉️ *ঠিকানা:* \`${email}\`
+🕒 *সময়:* ${mail.date || 'Unknown'}
+📧 *প্রেরক:* ${mail.from_field || 'Unknown'}
+📝 *বিষয়:* ${mail.subject || 'No Subject'}
+🔢 *OTP কোড:* \`${mail.code || 'Not Found'}\`
+          `;
+
+          await bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
+          found = true;
+          break;
+        }
+      } catch (error) {
+        console.error(`Error checking ${email}:`, error.message);
+      }
+    }
+
+    if (!found) {
+      await bot.sendMessage(chatId, `❌ ${username} নামে কোনো ইমেইল পাওয়া যায়নি`);
+    }
+
+  } catch (error) {
+    console.error('General error:', error);
+    bot.sendMessage(chatId, '⚠️ সার্ভারে সমস্যা হচ্ছে, পরে চেষ্টা করুন');
+  }
+}
+
+// /checkemail command
+bot.onText(/\/checkemail (.+)/, (msg, match) => {
+  const username = match[1].trim();
+  checkEmail(username, msg.chat.id);
+});
 
 // Keep-alive
 http.createServer((req, res) => {
