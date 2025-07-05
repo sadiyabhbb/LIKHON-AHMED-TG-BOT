@@ -18,7 +18,7 @@ const bot = new TelegramBot(token, {
 
 // Admin Info
 const ADMIN_USERNAME = 'rx_rihad';
-const ADMIN_UID = 123456789; // <-- Replace with your actual UID
+const ADMIN_UID = 7933110913; // <-- Replace with your actual UID
 
 // User DB Paths
 const DB_PATH = path.join(__dirname, 'users.json');
