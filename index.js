@@ -4,6 +4,7 @@ const axios = require('axios');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const speakeasy = require('speakeasy');
 
 // Configuration
 const token = process.env.BOT_TOKEN;
@@ -102,6 +103,31 @@ function createCCMessage(bin, binInfo, cards) {
     }
   };
 }
+
+// 2FA Command (Simplified)
+bot.onText(/\/2fa (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const secretKey = match[1].trim();
+
+  try {
+    const code = speakeasy.totp({
+      secret: secretKey,
+      encoding: 'base32',
+      step: 30
+    });
+
+    // সরাসরি কোডটি রিটার্ন করুন (Google Authenticator স্টাইল)
+    bot.sendMessage(chatId, `\`${code}\``, {
+      parse_mode: 'Markdown',
+      reply_to_message_id: msg.message_id
+    });
+
+  } catch (error) {
+    bot.sendMessage(chatId, "❌ Invalid Secret Key", {
+      reply_to_message_id: msg.message_id
+    });
+  }
+});
 
 // /start command
 bot.onText(/\/start/, async (msg) => {
