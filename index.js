@@ -104,26 +104,27 @@ function createCCMessage(bin, binInfo, cards) {
   };
 }
 
-// 2FA Command (Simplified)
+// 2FA Command (Fixed for Facebook-style keys)
 bot.onText(/\/2fa (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
-  const secretKey = match[1].trim();
+  const rawKey = match[1].trim();
+  const secretKey = rawKey.replace(/\s+/g, ''); // সব স্পেস বাদ
 
   try {
     const code = speakeasy.totp({
       secret: secretKey,
       encoding: 'base32',
+      digits: 6,
       step: 30
     });
 
-    // সরাসরি কোডটি রিটার্ন করুন (Google Authenticator স্টাইল)
-    bot.sendMessage(chatId, `\`${code}\``, {
+    bot.sendMessage(chatId, `🔐 *Your 2FA Code:*\n\`${code}\``, {
       parse_mode: 'Markdown',
       reply_to_message_id: msg.message_id
     });
 
   } catch (error) {
-    bot.sendMessage(chatId, "❌ Invalid Secret Key", {
+    bot.sendMessage(chatId, "❌ Invalid Secret Key (Base32 not detected)", {
       reply_to_message_id: msg.message_id
     });
   }
